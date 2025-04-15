@@ -36,11 +36,9 @@ jobs:
     needs: build-and-push
     strategy:
       matrix:
-        host: [vm1, vm2, vm3]
         ip: [192.168.123.15, 192.168.123.16, 192.168.123.17]
-        key: [VM_SSH_KEY, VM_SSH_KEY, VM_SSH_KEY]
     steps:
-      - name: Deploy to ${{ matrix.host }}
+      - name: Deploy to ${{ matrix.ip }}
         uses: appleboy/ssh-action@v0.1.8
         with:
           host: ${{ matrix.ip }}
