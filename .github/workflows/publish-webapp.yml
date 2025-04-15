@@ -1,0 +1,53 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set Commit Hash
+        id: vars
+        run: echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Docker image
+        run: |
+          docker build --build-arg COMMIT_HASH=$COMMIT_HASH -t ${{ secrets.DOCKERHUB_USERNAME }}/basic-webapp:latest ./webapp
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/basic-webapp:latest
+  deploy:
+    name: Deploy to VMs
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    strategy:
+      matrix:
+        host: [vm1, vm2, vm3]
+        ip: [192.168.123.15, 192.168.123.16, 192.168.123.17]
+        key: [VM_SSH_KEY, VM_SSH_KEY, VM_SSH_KEY]
+    steps:
+      - name: Deploy to ${{ matrix.host }}
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ matrix.ip }}
+          username: tanvir
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/basic-webapp:latest
+            docker stop webapp || true
+            docker rm webapp || true
+            docker run -d --name webapp -p 8080:8080  ${{ secrets.DOCKERHUB_USERNAME }}/basic-webapp:latest
